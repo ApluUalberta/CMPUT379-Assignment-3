@@ -48,9 +48,9 @@ void fs_mount(char *new_disk_name){
     int ConsistencyError = 0;
 
     int filed = ::open(new_disk_name,O_RDWR);
-    if (filed > 0)
+    if (filed < 0){
         std:: cout << "unable to open disk\n";
-    //if found..
+    }    //if found..
 
     ::read(filed, Disk.free_block_list, 16);
 
@@ -69,8 +69,11 @@ void fs_mount(char *new_disk_name){
             not_used[i] = (std:: string) new_inode.name;
         }
         else if (isBitISet(new_inode.used_size, 7)){
-            used[i] = (std:: string) new_inode.name;
+            if (isBitISet(new_inode.dir_parent,7)){
+                used[i] = (std:: string) new_inode.name;
+            }
         }
+
     }
     
     // Blocks that are marked free in the free-space list cannot be allocated to any file. Similarly, blocks marked in use in the free-space list must be allocated to exactly one file.
@@ -131,30 +134,37 @@ void fs_read(char name[5], int block_num){
 
 }
 
-
-
 void fs_write(char name[5], int block_num){
-
+    
 }
 
 
+std::vector<std::string> tokenize(const std::string &str, const char *delim) {
+  char* cstr = new char[str.size() + 1];
+  std::strcpy(cstr, str.c_str());
 
+  char* tokenized_string = strtok(cstr, delim);
 
-void tokenize(char* str, const char* delim, char ** argv) {
-    char* token;
-    token = strtok(str, delim);
-    for(size_t i = 0; token != NULL; ++i){
-        argv[i] = token;
-        token = strtok(NULL, delim);
-    }
+  std::vector<std::string> tokens;
+  while (tokenized_string != NULL)
+  {
+    tokens.push_back(std::string(tokenized_string));
+    tokenized_string = strtok(NULL, delim);
+  }
+  delete[] cstr;
+
+  return tokens;
 }
 
 int main(){
 
     std:: string input;
     std:: vector<std:: string> string_input_list;
+    std:: string delim = " ";
 
-    getline (std::cin, input);
+    getline(std::cin, input);
+    std::vector<std::string> tokenizer = tokenize(input, delim.c_str());          // tokenize with ;
+    
 
 }
 
