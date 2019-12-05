@@ -86,14 +86,14 @@ void fs_mount(char *new_disk_name){
                     continue;
                 }
                 if (!isBitISet(mockBlock->free_block_list[check_byte],check_bit)){
-                    std:: cerr << "Error: file system in " << new_disk_name << " is inconsistent with error code 1a\n";
+                    std:: cerr << "Error: file system in " << new_disk_name << " is inconsistent with error code 1\n";
                     return;
                 }
                 if (map1.find(bytecheckmod)==map1.end()){
                     map1[start+j] = i;
                 }else{
                     //error message.
-                    std:: cerr << "Error: file system in " << new_disk_name << " is inconsistent with error code 1b\n";
+                    std:: cerr << "Error: file system in " << new_disk_name << " is inconsistent with error code 1\n";
                     return;
                 }
             }
@@ -109,7 +109,7 @@ void fs_mount(char *new_disk_name){
             if (isBitISet(mockBlock->free_block_list[i],7-j)){
                 int arithmetic = size_macro*i+j;
                 if (map1.find(arithmetic) == map1.end()){
-                    std:: cout << "Error: file system in " << new_disk_name << " is inconsistent with error code 1c\n";
+                    std:: cout << "Error: file system in " << new_disk_name << " is inconsistent with error code 1\n";
                     return;
                 }
             }
@@ -365,6 +365,10 @@ void fs_create(char name[5], int size){
 
 }
 
+void fs_delete(char name[5]){
+
+}
+
 void fs_read(char name[5], int block_num){
 
 }
@@ -372,19 +376,17 @@ void fs_read(char name[5], int block_num){
 
 void fs_cd(char name[5]){
     // changes the given directory to the specified directory
-    
-
-
-    if (strcmp(name, dot.c_str()) != -1){
-        return;
-    }
     if (strcmp(name,doubledot.c_str())){
         if (Directorylocation != MAX127){
             Directorylocation = Disk->inode[Directorylocation].dir_parent & mask;
         } 
         return;
     }
-    for (int i = 0; i < INODES;i++){
+    else if (strcmp(name, dot.c_str()) != -1){
+        return;
+    }
+
+    for (uint8_t i = 0; i < INODES;i++){
         uint8_t parent = Disk->inode[i].dir_parent;
         parent = parent & mask;
         if (strcmp(Disk->inode[i].name,name) == 0 && (parent == Directorylocation)){
@@ -402,8 +404,10 @@ void fs_write(char name[5], int block_num){
 }
 
 void fs_buff(uint8_t buff[1024]){
+
     memset(buffer,0,sizeof(buffer));
     memcpy(buffer,buff,sizeof(buffer));
+
 }
 
 void fs_defrag(void){
@@ -440,6 +444,7 @@ int readInput(std:: string command){
     std:: vector<std:: string> tokenizer = tokenize(command.c_str()," ");
 
     if (tokenizer[0] == "M" && tokenizer.size() == 2){
+
         char *arr = new char[tokenizer[1].size()+1];
         strcpy(arr, tokenizer[1].c_str());
         fs_mount(arr);
@@ -448,34 +453,68 @@ int readInput(std:: string command){
     }
     else if (tokenizer[0] == "C" && tokenizer.size() == 3){
         if (tokenizer[1].size() > USED_BLOCK){
+            std:: cerr << "Command Error: <input file name>, <line number>";
             return -1;
         }
         char *arr = new char[tokenizer[1].size()+1];
         strcpy(arr,tokenizer[1].c_str());
-        fs_create(arr,stoi(tokenizer[2]));
+        int size = stoi(tokenizer[2]);
+        fs_create(arr,size);
         delete[] arr;
         return 0;
     }
     else if (tokenizer[0] == "D" && tokenizer.size() == 2){
-        
+        char *arr = new char[tokenizer[1].size()+1];
+        fs_delete(arr);
+        delete[] arr;
+        return 0;
     }
     else if (tokenizer[0] == "R" && tokenizer.size() == 3){
-
+        char *arr = new char[tokenizer[1].size() + 1];
+        strcpy(arr, tokenizer[1].c_str());
+        int bnumber = stoi(tokenizer[2]);
+        fs_read(arr, bnumber);
+        delete[] arr;
+        return 0;
     }
     else if (tokenizer[0] == "W" && tokenizer.size() == 3){
-
+        char *arr = new char[tokenizer[1].size() + 1];
+        strcpy(arr, tokenizer[1].c_str());
+        int bnumber = stoi(tokenizer[2]);
+        fs_read(arr, bnumber);
+        delete[] arr;
+        return 0;
     }
-    else if (tokenizer[0] == "B" && tokenizer.size() == 2){
-
+    else if (tokenizer[0] == "B" && tokenizer.size() >= 2){
+        
+        if ((command.size() > 1026)){
+            // command exceeds the size of the buffer
+            std:: cerr << "command exceeds the size of the buffer.\n";
+            return -1;
+        }
+        uint8_t *buff = new uint8_t[BUFFER_SIZE_PRESET];
+        memset(buff,0,1024);
+        copy(command.begin() + command.find("B"),command.end(), buff);
+        fs_buff(buff);
+        delete[] buff;
+        return 0;
     }
     else if (tokenizer[0] == "L" && tokenizer.size() == 1){
-
+        fs_ls();
+        return 0;
     }
     else if (tokenizer[0] == "E" && tokenizer.size() == 3){
+        char *arr = new char[tokenizer[1].size() + 1];
+        strcpy(arr, tokenizer[1].c_str());
+        int bnumber = stoi(tokenizer[2]);
+        fs_resize(arr,bnumber);
+        delete[] arr;
+        return 0;
 
     }
     else if (tokenizer[0] == "O" && tokenizer.size() == 1){
-
+        fs_defrag();
+        return 0;
     }
     else if (tokenizer[0] == "Y" && tokenizer.size() == 2){
         char *arr = new char[tokenizer[1].size()+1];
@@ -484,6 +523,7 @@ int readInput(std:: string command){
         delete[] arr;
         return 0;
     }
+    // std:: cerr << "Command Error: <input file name>, <line number>\n";
     return -1;
 
 }
@@ -492,6 +532,7 @@ int main(int argc, char *argv[]){
     if (argc != 2){
         std:: cerr << "Usage: ./fs <input_file>\n";
     }
+    //clear the given buffer...
     memset(buffer,0,sizeof(buffer));
     std:: string line;
     char * input = argv[1];
