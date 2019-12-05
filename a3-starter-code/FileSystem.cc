@@ -29,7 +29,7 @@ std:: string Dname;
 uint8_t buffer[1024];
 
 int mask = 0x7f;
-
+int mask0x80 = 0x80;
 int isBitISet( uint8_t ch, int i ){
     uint8_t mask = 1 << i;
     return mask & ch;
@@ -113,7 +113,7 @@ void fs_mount(char *new_disk_name){
         memcpy(name,storage,5);
         name[6] = '\0';
 		char Sused = storage[5];
-        char size = Sused & mask;
+        //char size = Sused & mask;
 		uint8_t start;
         char * newstorage6 = storage +6;
         char * newstorage7 = storage + 7;
@@ -263,8 +263,8 @@ void fs_mount(char *new_disk_name){
         memcpy(name,storage,5);
         name[6] = '\0';
 		char used = storage[5];
-        char size = used & mask;
-        int sizeInt = (int) size;
+        //char size = used & mask;
+        //int sizeInt = (int) size;
 
         char * newstorage6 = storage + 6;
         char * newstorage7 = storage + 7;
@@ -359,11 +359,15 @@ void fs_read(char name[5], int block_num){
 
 void fs_cd(char name[5]){
     // changes the given directory to the specified directory
+    std:: string dot = ".";
+    std:: string doubledot = "..";
     
-    if (strcmp(name, ".") != -1){
+
+
+    if (strcmp(name, dot.c_str()) != -1){
         return;
     }
-    if (strcmp(name,"..")){
+    if (strcmp(name,doubledot.c_str())){
         if (Directorylocation != MAX127){
             Directorylocation = Disk->inode[Directorylocation].dir_parent & mask;
         } 
@@ -371,9 +375,9 @@ void fs_cd(char name[5]){
     }
     for (int i = 0; i < INODES;i++){
         uint8_t parent = Disk->inode[i].dir_parent;
-        parent = parent & 0x7f;
+        parent = parent & mask;
         if (strcmp(Disk->inode[i].name,name) == 0 && (parent == Directorylocation)){
-            if (Disk->inode[i].dir_parent & 0x80){
+            if (Disk->inode[i].dir_parent & mask0x80){
                 Directorylocation = i;
                 return;
             }
@@ -387,7 +391,7 @@ void fs_write(char name[5], int block_num){
 }
 
 void fs_buff(uint8_t buff[1024]){
-    memset(buffer,buff,sizeof(buffer));
+    memset(buffer,0,sizeof(buffer));
     memcpy(buffer,buff,sizeof(buffer));
 }
 
