@@ -376,7 +376,7 @@ void fs_read(char name[5], int block_num){
 
 void fs_cd(char name[5]){
     // changes the given directory to the specified directory
-    if (strcmp(name,doubledot.c_str())){
+    if (strcmp(name,doubledot.c_str()) != -1){
         if (Directorylocation != MAX127){
             Directorylocation = Disk->inode[Directorylocation].dir_parent & mask;
         } 
@@ -404,10 +404,8 @@ void fs_write(char name[5], int block_num){
 }
 
 void fs_buff(uint8_t buff[1024]){
-
     memset(buffer,0,sizeof(buffer));
     memcpy(buffer,buff,sizeof(buffer));
-
 }
 
 void fs_defrag(void){
@@ -438,6 +436,8 @@ std::vector<std::string> tokenize(const std::string &str, const char *delim) {
 
   return tokens;
 }
+
+// Main....
 
 
 int readInput(std:: string command){
@@ -487,7 +487,7 @@ int readInput(std:: string command){
     }
     else if (tokenizer[0] == "B" && tokenizer.size() >= 2){
         
-        if ((command.size() > 1026)){
+        if ((command.size() - command.find("B")> 1026)){
             // command exceeds the size of the buffer
             std:: cerr << "command exceeds the size of the buffer.\n";
             return -1;
