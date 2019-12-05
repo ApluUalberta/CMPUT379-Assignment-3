@@ -17,19 +17,34 @@
 #include <map>
 #include <set>
 
+
+#define BUFFER_SIZE_PRESET 1024
+
 #define MAX127 127
 #define MAX126 126
+#define MIN1 1
 #define SOH "\x01"
 #define INODES 126
+#define USED_BLOCK 5
+#define NAME_SIZE_LIMIT 6
+
+
 
 Super_block *Disk;
 Super_block *mockBlock;
 uint8_t Directorylocation = 0;
 std:: string Dname;
-uint8_t buffer[1024];
+uint8_t buffer[BUFFER_SIZE_PRESET];
 
+std:: string dot = ".";
+std:: string doubledot = "..";
+int size_macro = 8;
+char nullchar = '\0';
 int mask = 0x7f;
 int mask0x80 = 0x80;
+
+
+
 int isBitISet( uint8_t ch, int i ){
     uint8_t mask = 1 << i;
     return mask & ch;
@@ -45,15 +60,15 @@ void fs_mount(char *new_disk_name){
 
 
     Super_block *mockBlock = new Super_block;
-    read(filed, mockBlock->free_block_list, 16);
+    read(filed, mockBlock->free_block_list, 2*size_macro);
 
 
-	std:: map<int,int> usedBlocks;
+	std:: map<int,int> map1;
 	for (int i = 0; i < INODES;i++){
-		char storage[8];
+		char storage[size_macro];
 
-		read(filed,storage,8);
-		char Bused = storage[5];
+		read(filed,storage,size_macro);
+		char Bused = storage[USED_BLOCK];
         char size = Bused & mask;
         int intsizeversion = (int) size;
 		uint8_t start;
@@ -64,18 +79,18 @@ void fs_mount(char *new_disk_name){
             for (int j = 0; j < intsizeversion; j++){
                 uint8_t bytecheckmod = start + j;
                 uint8_t bitcheckmod = start + j;
-                int check_byte = (bytecheckmod)/8;
-                int check_bit = (bitcheckmod)%8;
+                int check_byte = (bytecheckmod)/size_macro;
+                int check_bit = (bitcheckmod)%size_macro;
                 check_bit = 7-check_bit;
-                if (check_byte > 16){
+                if (check_byte > 2*size_macro){
                     continue;
                 }
                 if (!isBitISet(mockBlock->free_block_list[check_byte],check_bit)){
                     std:: cerr << "Error: file system in " << new_disk_name << " is inconsistent with error code 1a\n";
                     return;
                 }
-                if (usedBlocks.find(bytecheckmod)==usedBlocks.end()){
-                    usedBlocks[start+j] = i;
+                if (map1.find(bytecheckmod)==map1.end()){
+                    map1[start+j] = i;
                 }else{
                     //error message.
                     std:: cerr << "Error: file system in " << new_disk_name << " is inconsistent with error code 1b\n";
@@ -86,14 +101,14 @@ void fs_mount(char *new_disk_name){
 		} 
         
 	}
-    for (int i = 0; i < 16; i++){
-        for (int j = 0; j < 8; j++){
+    for (int i = 0; i < 2*size_macro; i++){
+        for (int j = 0; j < size_macro; j++){
             if (i == 0 && j == 0){
                 continue;
             }
             if (isBitISet(mockBlock->free_block_list[i],7-j)){
-                int arithmetic = 8*i+j;
-                if (usedBlocks.find(arithmetic) == usedBlocks.end()){
+                int arithmetic = size_macro*i+j;
+                if (map1.find(arithmetic) == map1.end()){
                     std:: cout << "Error: file system in " << new_disk_name << " is inconsistent with error code 1c\n";
                     return;
                 }
@@ -103,16 +118,16 @@ void fs_mount(char *new_disk_name){
 
     int lseekval = -1*lseek(filed,0,SEEK_CUR);
     lseek(filed,lseekval,SEEK_CUR);
-    lseek(filed,16,SEEK_CUR);
+    lseek(filed,2*size_macro,SEEK_CUR);
 
 	std:: multimap<std:: string,uint8_t> usedBlocks_2;
 	for (int i = 0; i < INODES;i++){
-		char storage[8];
-		read(filed,storage,8);
-        char name[6];
-        memcpy(name,storage,5);
-        name[6] = '\0';
-		char Sused = storage[5];
+		char storage[size_macro];
+		read(filed,storage,size_macro);
+        char name[NAME_SIZE_LIMIT];
+        memcpy(name,storage,USED_BLOCK);
+        name[NAME_SIZE_LIMIT] = nullchar;
+		char Sused = storage[USED_BLOCK];
         //char size = Sused & mask;
 		uint8_t start;
         char * newstorage6 = storage +6;
@@ -142,16 +157,16 @@ void fs_mount(char *new_disk_name){
     // check 3
     lseekval = -1*lseek(filed,0,SEEK_CUR);
     lseek(filed,lseekval,SEEK_CUR);
-    lseek(filed,16,SEEK_CUR);
+    lseek(filed,2*size_macro,SEEK_CUR);
 
 	std:: multimap<std:: string,uint8_t> usedBlocks_3;
 	for (int i = 0; i < INODES;i++){
-		char storage[8];
-		read(filed,storage,8);
-        char name[6];
-        memcpy(name,storage,5);
-        name[6] = '\0';
-		char used = storage[5];
+		char storage[size_macro];
+		read(filed,storage,size_macro);
+        char name[NAME_SIZE_LIMIT];
+        memcpy(name,storage,USED_BLOCK);
+        name[NAME_SIZE_LIMIT] = nullchar;
+		char used = storage[USED_BLOCK];
         char * newstorage6 = storage+6;
         char * newstorage7 = storage+7;
 		uint8_t start;
@@ -168,8 +183,8 @@ void fs_mount(char *new_disk_name){
         }
 
         else{
-            for (int i = 0; i < 8; i++){
-                for (int j = 0; j < 8; j++){
+            for (int i = 0; i < size_macro; i++){
+                for (int j = 0; j < size_macro; j++){
                     if (isBitISet(storage[i],j)){
                         std:: cerr << "Error: file system in " << new_disk_name << " is inconsistent with Error 3\n";
                         return;
@@ -181,17 +196,17 @@ void fs_mount(char *new_disk_name){
     // check 4
     lseekval = -1*lseek(filed,0,SEEK_CUR);
     lseek(filed,lseekval,SEEK_CUR);
-    lseek(filed,16,SEEK_CUR);
+    lseek(filed,2*size_macro,SEEK_CUR);
 
 	std:: multimap<std:: string,uint8_t> usedBlocks_4;
 	for (int i = 0; i < INODES;i++){
-		char storage[8];
+		char storage[size_macro];
 
-		read(filed,storage,8);
-        char name[6];
-        memcpy(name,storage,5);
-        name[6] = '\0';
-		char used = storage[5];
+		read(filed,storage,size_macro);
+        char name[NAME_SIZE_LIMIT];
+        memcpy(name,storage,USED_BLOCK);
+        name[NAME_SIZE_LIMIT] = nullchar;
+		char used = storage[USED_BLOCK];
         char * newstorage6 = storage+6;
         char * newstorage7 = storage+7;
 		uint8_t start;
@@ -204,7 +219,7 @@ void fs_mount(char *new_disk_name){
         if (isBitISet(used,sev)){
             if (!(isBitISet(parent,sev))){
                 int sInt = (unsigned int) start;
-                if (sInt <1 || sInt > 127){
+                if (sInt > MAX127 ||sInt <MIN1){
                     std:: cerr << "Error, File System in " << new_disk_name << " is inconsistent with Error 4\n";
                     return;
                 }
@@ -215,18 +230,17 @@ void fs_mount(char *new_disk_name){
     // check 5
     int lseeksecond = -1*lseek(filed,0,SEEK_CUR);
     lseek(filed,lseeksecond,SEEK_CUR);
-    lseek(filed,16,SEEK_CUR);
+    lseek(filed,2*size_macro,SEEK_CUR);
 
 	std:: multimap<std:: string,uint8_t> usedBlocks_5;
 	for (int i = 0; i < INODES;i++){
-		//int ind = 8*i+(7-j);
-		char storage[8];
+		char storage[size_macro];
 
-		read(filed,storage,8);
-        char name[6];
-        memcpy(name,storage,5);
-        name[6] = '\0';
-		char used = storage[5];
+		read(filed,storage,size_macro);
+        char name[NAME_SIZE_LIMIT];
+        memcpy(name,storage,USED_BLOCK);
+        name[NAME_SIZE_LIMIT] = nullchar;
+		char used = storage[USED_BLOCK];
         char size = used & mask;
         int sizeInt = (int) size;
 
@@ -251,18 +265,17 @@ void fs_mount(char *new_disk_name){
     int lseekthird = -1*lseek(filed,0,SEEK_CUR);
     // check 6
     lseek(filed,lseekthird,SEEK_CUR);
-    lseek(filed,16,SEEK_CUR);
+    lseek(filed,2*size_macro,SEEK_CUR);
 
 	std:: set<int> usedBlocks_6;
 	for (int i = 0; i < INODES;i++){
-		//int ind = 8*i+(7-j);
-		char storage[8];
+		char storage[size_macro];
 
-		read(filed,storage,8);
-        char name[6];
-        memcpy(name,storage,5);
-        name[6] = '\0';
-		char used = storage[5];
+		read(filed,storage,size_macro);
+        char name[NAME_SIZE_LIMIT];
+        memcpy(name,storage,USED_BLOCK);
+        name[NAME_SIZE_LIMIT] = nullchar;
+		char used = storage[USED_BLOCK];
         //char size = used & mask;
         //int sizeInt = (int) size;
 
@@ -291,12 +304,12 @@ void fs_mount(char *new_disk_name){
 
             int lseekfinal = -1*lseek(filed,0,SEEK_CUR);
             lseek(filed,lseekfinal,SEEK_CUR);
-            lseek(filed,16,SEEK_CUR);
-            int arithmetic = 8*it;
+            lseek(filed,2*size_macro,SEEK_CUR);
+            int arithmetic = size_macro*it;
             lseek(filed,arithmetic,SEEK_CUR);
-            char storage[8];
-            read(filed,storage,8);
-            char used = storage[5];
+            char storage[size_macro];
+            read(filed,storage,size_macro);
+            char used = storage[USED_BLOCK];
             uint8_t par;
 
             char * newstorage7 = storage + 7;
@@ -315,15 +328,15 @@ void fs_mount(char *new_disk_name){
     int lseekfifth = -1*lseek(filed,0,SEEK_CUR);
     
     lseek(filed,lseekfifth,SEEK_CUR);
-    lseek(filed,16,SEEK_CUR);
+    lseek(filed,2*size_macro,SEEK_CUR);
 
-    read(filed,Disk->free_block_list,16);
+    read(filed,Disk->free_block_list,2*size_macro);
     for (int i = 0; i < INODES; i++){
         Inode newI;
-        char storage[8];
-        read(filed,storage,8);
-        memcpy(newI.name, storage,5);
-        char * newstorage5 = storage + 5;
+        char storage[size_macro];
+        read(filed,storage,size_macro);
+        memcpy(newI.name, storage,USED_BLOCK);
+        char * newstorage5 = storage + USED_BLOCK;
         memcpy(&(newI.used_size),newstorage5,1);
         //mask used with 0x7f
         newI.used_size &= mask;
@@ -359,8 +372,6 @@ void fs_read(char name[5], int block_num){
 
 void fs_cd(char name[5]){
     // changes the given directory to the specified directory
-    std:: string dot = ".";
-    std:: string doubledot = "..";
     
 
 
@@ -387,7 +398,7 @@ void fs_cd(char name[5]){
 }
 
 void fs_write(char name[5], int block_num){
-
+    
 }
 
 void fs_buff(uint8_t buff[1024]){
@@ -425,7 +436,7 @@ std::vector<std::string> tokenize(const std::string &str, const char *delim) {
 }
 
 
-int parseCommand(std:: string command){
+int readInput(std:: string command){
     std:: vector<std:: string> tokenizer = tokenize(command.c_str()," ");
 
     if (tokenizer[0] == "M" && tokenizer.size() == 2){
@@ -436,7 +447,7 @@ int parseCommand(std:: string command){
         return 0;
     }
     else if (tokenizer[0] == "C" && tokenizer.size() == 3){
-        if (tokenizer[1].size() > 5){
+        if (tokenizer[1].size() > USED_BLOCK){
             return -1;
         }
         char *arr = new char[tokenizer[1].size()+1];
@@ -446,7 +457,7 @@ int parseCommand(std:: string command){
         return 0;
     }
     else if (tokenizer[0] == "D" && tokenizer.size() == 2){
-
+        
     }
     else if (tokenizer[0] == "R" && tokenizer.size() == 3){
 
@@ -473,6 +484,7 @@ int parseCommand(std:: string command){
         delete[] arr;
         return 0;
     }
+    return -1;
 
 }
 
@@ -480,28 +492,26 @@ int main(int argc, char *argv[]){
     if (argc != 2){
         std:: cerr << "Usage: ./fs <input_file>\n";
     }
+    memset(buffer,0,sizeof(buffer));
+    std:: string line;
+    char * input = argv[1];
+    std:: ifstream commands (input);
 
     Disk = new Super_block;
     mockBlock = new Super_block;
 
-    memset(buffer,0,sizeof(buffer));
-
-    char * input = argv[1];
-    std:: string line;
-    std:: ifstream commands (input);
-    if (commands.is_open()){
+    if (!commands.is_open()){
+        return -1;
+    }else{
         int lnumber = 1;
         while (getline(commands,line)){
-            if (parseCommand(line)==-1){
+            if (readInput(line)==-1){
                 std:: cerr << "Command Error: " << input << ", " << lnumber << "\n";
             }
             lnumber = lnumber + 1;
         }
     }
-
     delete Disk;
     delete mockBlock;
+    return 0;
 }
-
-
-
