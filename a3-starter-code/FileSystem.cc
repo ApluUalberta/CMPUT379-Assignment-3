@@ -360,7 +360,6 @@ void fs_create(char name[5], int size){
         return;
     }
     // search for the name that matches with the current name.
-
     // delete the file or directory with char name[5]
 
 }
@@ -379,10 +378,12 @@ void fs_cd(char name[5]){
     if (strcmp(name,doubledot.c_str()) != -1){
         if (Directorylocation != MAX127){
             Directorylocation = Disk->inode[Directorylocation].dir_parent & mask;
+            std::cout<< Directorylocation << "parent \n";
         } 
         return;
     }
     else if (strcmp(name, dot.c_str()) != -1){
+        std::cout<< Directorylocation << "current \n";
         return;
     }
 
@@ -390,10 +391,12 @@ void fs_cd(char name[5]){
         uint8_t parent = Disk->inode[i].dir_parent;
         parent = parent & mask;
         if (strcmp(Disk->inode[i].name,name) == 0 && (parent == Directorylocation)){
-            if (Disk->inode[i].dir_parent & mask0x80){
-                Directorylocation = i;
-                return;
+            if (!(Disk->inode[i].dir_parent & mask0x80)){
+                continue;
             }
+            Directorylocation = i;
+            std::cout<< Directorylocation << "\n";
+            return;
         }
     }
     std:: cerr << "Error, File/directory" << name << "does not exist\n";
@@ -519,7 +522,9 @@ int readInput(std:: string command){
     else if (tokenizer[0] == "Y" && tokenizer.size() == 2){
         char *arr = new char[tokenizer[1].size()+1];
         strcpy(arr,tokenizer[1].c_str());
+        std::cout<< unsigned (Directorylocation) << "current \n";
         fs_cd(arr);
+        std::cout<< unsigned (Directorylocation) << "current \n";
         delete[] arr;
         return 0;
     }
