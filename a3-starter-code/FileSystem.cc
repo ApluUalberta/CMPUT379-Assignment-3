@@ -577,8 +577,26 @@ void fs_read(char name[5], int block_num){
         std::cout << "No disk is mounted\n";
         return;
     }
-
-
+    for (int i = 0; i < INODES; i++){
+        uint8_t parent = Disk->inode[i].dir_parent & 0x7f;
+        if (strncmp(Disk->inode[i].name,name,5) == 0){
+            if (parent == Directorylocation){
+                int filed = open(Dname.c_str(),O_RDWR);
+                lseek(filed, 1024*(Disk->inode[i].start_block)+1024*block_num, SEEK_SET);
+                read(filed,buffer,1024);
+                close(filed);
+                return;
+            }
+            //write buffer to the block_numth block of the file...
+            // take the buffer
+            else{
+                std:: cerr << "Error: " << name << "does not have block " << block_num << "\n";
+                return;
+            }
+        }
+    }
+    std::cerr << "Error: file " << name << "does not exist\n";
+    return;
 }
 
 
@@ -620,8 +638,26 @@ void fs_write(char name[5], int block_num){
         std::cout << "No disk is mounted\n";
         return;
     }
-    
-
+    for (int i = 0; i < INODES; i++){
+        uint8_t parent = Disk->inode[i].dir_parent & 0x7f;
+        if (strncmp(Disk->inode[i].name,name,5) == 0){
+            if (parent == Directorylocation){
+                int filed = open(Dname.c_str(),O_RDWR);
+                lseek(filed, 1024*(Disk->inode[i].start_block)+1024*block_num, SEEK_SET);
+                write(filed,buffer,1024);
+                close(filed);
+                return;
+            }
+            //write buffer to the block_numth block of the file...
+            // take the buffer
+            else{
+                std:: cerr << "Error: " << name << "does not have block " << block_num << "\n";
+                return;
+            }
+        }
+    }
+    std::cerr << "Error: file " << name << "does not exist\n";
+    return;
 }
 
 void fs_buff(uint8_t buff[1024]){
@@ -660,6 +696,7 @@ void fs_ls(void){
     }
     printf(".     %3d KB\n", (int)mymap.size());
 
+
     if (Directorylocation == 127){
         printf(".     %3d KB\n", (int)mymap.size());  
     }else{
@@ -667,13 +704,16 @@ void fs_ls(void){
     }
 
     for (auto it = mymap.begin(); it != mymap.end(); it++){
+        char * name = new char[6];
+        strncpy(name, it->second.name,5);
+        name[6] = '\0';
         if (!(it->second.dir_parent & 0x80)){
             printf("%-5s %3d\n", it->second.name, it->second.used_size & 0x7f);
         }else{
             printf("%-5s %3d\n", it->second.name, Child_count(Disk->inode[Directorylocation].dir_parent&0x7f)+2);
         }
-        
-    }   
+    }
+
 }
 
 std::vector<std::string> tokenize(const std::string &str, const char *delim) {
