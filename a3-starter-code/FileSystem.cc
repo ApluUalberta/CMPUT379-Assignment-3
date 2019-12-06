@@ -72,7 +72,7 @@ void fs_mount(char *new_disk_name){
         uint8_t size = Bused & 0x7F;
         int intsizeversion = unsigned(size);
 		uint8_t start;
-        char * newstorage = storage + 6;
+
         memcpy(&start, storage+6,sizeof(uint8_t));
 		//char parent = temp[7];
 		if (isBitISet(Bused,7)){
@@ -357,7 +357,6 @@ void fs_create(char name[5], int size){
         std:: cout <<  "Error: Superblock in disk "<< Dname << " is full, cannot create " << name << "\n";
         return;
     }
-    std::cout << name << " is in node "<<i<<"\n";
 
     for (int j = 0; j < INODES; j++){
         if (strncmp(Disk->inode[j].name,name,USED_BLOCK) == 0){
@@ -423,9 +422,6 @@ void fs_create(char name[5], int size){
             }
         }
     }
-    if (i==0) {
-        std::cout<<unsigned(Directorylocation|dir)<<"\n";
-    }
     Disk->inode[i].dir_parent = Directorylocation|dir;
     Disk->inode[i].used_size = size|0x80;
     Disk->inode[i].start_block = start;
@@ -459,6 +455,35 @@ void fs_delete(char name[5]){
     if (Dname.empty()){
         std::cout << "No disk is mounted\n";
         return;
+    }
+    for (int j = 0; j < INODES; j++){
+        if (strncmp(Disk->inode[j].name,name,USED_BLOCK) == 0){
+            uint8_t parent = Disk->inode[j].dir_parent & 0x7f;
+            if(parent == Directorylocation){
+                // i is the inode that we want
+                // check if inode[i] is a directory or file
+                if (Disk->inode[j].dir_parent&0x80){
+                    // is a directory
+                    std:: map<int, Inode> Dchildren;
+                    for (int k = 0; k < INODES; k++){
+                        //find all inodes with the parent j
+                        if ((Disk->inode[k].dir_parent & 0x7f) == parent){
+                            Dchildren.insert(std::pair<int,Inode>(k,Disk->inode[k]));
+                        }
+                    }
+
+                    for (auto itr = Dchildren.begin(); itr != Dchildren.end(); itr++){
+                        fs_delete(it->second.name);
+                    }
+                    memset(Disk->inode[j].name,0,5);
+                    memset(Disk->inode[j].start_block,0,1);
+                    memset(Disk->inode[j].used_size,0,1);
+                    memset(Disk->inode[j].dir_parent,0,1);
+                }else{
+
+                }
+            } 
+        }
     }
 }
 
@@ -576,6 +601,7 @@ int readInput(std:: string command){
         return 0;
     }
     else if (tokenizer[0] == "D" && tokenizer.size() == 2){
+        
         char *arr = new char[tokenizer[1].size()+1];
         fs_delete(arr);
         delete[] arr;
