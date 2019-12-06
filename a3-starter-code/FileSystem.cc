@@ -698,19 +698,20 @@ void fs_ls(void){
 
 
     if (Directorylocation == 127){
-        printf(".     %3d KB\n", (int)mymap.size());  
+        printf("..    %3d KB\n", (int)mymap.size());  
     }else{
         printf("..    %3d KB\n", Child_count((Disk->inode[Directorylocation].dir_parent &0x7f)));
     }
 
     for (auto it = mymap.begin(); it != mymap.end(); it++){
         char * name = new char[6];
+        memset(name,0,6);
         strncpy(name, it->second.name,5);
         name[6] = '\0';
         if (!(it->second.dir_parent & 0x80)){
-            printf("%-5s %3d\n", it->second.name, it->second.used_size & 0x7f);
+            printf("%-5s %3d\n", name, it->second.used_size & 0x7f);
         }else{
-            printf("%-5s %3d\n", it->second.name, Child_count(Disk->inode[Directorylocation].dir_parent&0x7f)+2);
+            printf("%-5s %3d\n", name, Child_count(Disk->inode[Directorylocation].dir_parent&0x7f)+2);
         }
     }
 
