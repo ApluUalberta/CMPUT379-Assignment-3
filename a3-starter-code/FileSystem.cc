@@ -496,6 +496,7 @@ void fs_delete(char name[5]){
                     memset(&Disk->inode[j].used_size,0,1);
                     memset(&Disk->inode[j].dir_parent,0,1);
 
+
                     int file_d = open(Dname.c_str(),O_RDWR);
                     if (file_d < 0){
                         std:: cerr << "unable to open disk\n";
@@ -577,6 +578,7 @@ void fs_read(char name[5], int block_num){
         return;
     }
 
+
 }
 
 
@@ -618,6 +620,8 @@ void fs_write(char name[5], int block_num){
         std::cout << "No disk is mounted\n";
         return;
     }
+    
+
 }
 
 void fs_buff(uint8_t buff[1024]){
@@ -668,7 +672,7 @@ void fs_ls(void){
         }else{
             printf("%-5s %3d\n", it->second.name, Child_count(Disk->inode[Directorylocation].dir_parent&0x7f)+2);
         }
-
+        
     }   
 }
 
