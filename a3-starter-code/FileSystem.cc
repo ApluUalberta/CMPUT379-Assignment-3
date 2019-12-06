@@ -50,6 +50,17 @@ int isBitISet( uint8_t ch, int i ){
     return mask & ch;
 } 
 
+int Child_count(uint8_t dir){
+    int count = 0;
+
+    for (int i = 0; i < INODES; i++){
+        if ((Disk->inode[i].dir_parent|0x7f) == dir){
+            count++;
+        }    
+    }
+    return count;
+}
+
 void fs_mount(char *new_disk_name){
     // check if the file name exists within the current working directory
     int filed = open(new_disk_name,O_RDWR);
@@ -456,6 +467,7 @@ void fs_delete(char name[5]){
         std::cout << "No disk is mounted\n";
         return;
     }
+
     for (int j = 0; j < INODES; j++){
         if (strncmp(Disk->inode[j].name,name,USED_BLOCK) == 0){
             uint8_t parent = Disk->inode[j].dir_parent & 0x7f;
@@ -471,16 +483,88 @@ void fs_delete(char name[5]){
                             Dchildren.insert(std::pair<int,Inode>(k,Disk->inode[k]));
                         }
                     }
-
+                    uint8_t savedDir = Directorylocation;
+                    Directorylocation = Disk->inode[j].dir_parent &0x80;
                     for (auto itr = Dchildren.begin(); itr != Dchildren.end(); itr++){
-                        fs_delete(it->second.name);
+                        fs_delete(itr->second.name);
                     }
-                    memset(Disk->inode[j].name,0,5);
-                    memset(Disk->inode[j].start_block,0,1);
-                    memset(Disk->inode[j].used_size,0,1);
-                    memset(Disk->inode[j].dir_parent,0,1);
-                }else{
+                    Directorylocation = savedDir;
 
+
+                    memset(&Disk->inode[j].name,0,5);
+                    memset(&Disk->inode[j].start_block,0,1);
+                    memset(&Disk->inode[j].used_size,0,1);
+                    memset(&Disk->inode[j].dir_parent,0,1);
+
+                    int file_d = open(Dname.c_str(),O_RDWR);
+                    if (file_d < 0){
+                        std:: cerr << "unable to open disk\n";
+                        return;
+                    }
+
+                    write(file_d,Disk->free_block_list, 16);
+
+                    for (int z = 0; z < INODES; z++){
+                        Inode inode = Disk->inode[z];
+                        char *name = new char[5];
+                        std:: memcpy(name,inode.name,5);
+                        int num = write(file_d,name,5);
+                        lseek(file_d,5-num,SEEK_CUR);
+                        write(file_d,&inode.used_size,1);
+                        write(file_d,&inode.start_block,1);
+                        write(file_d,&inode.dir_parent,1);
+                        delete[] name;
+
+                    }
+                    close(file_d);
+
+
+                }else{
+                    int filed = open(Dname.c_str(),O_RDWR);
+                    lseek(filed,Disk->inode[j].start_block*1024,SEEK_SET);
+                    for (int p = 0; p < INODES; p++){
+                        write(filed,0,1024);
+                    }
+
+                    int size = Disk->free_block_list[j] & 0x80;
+
+                    int k = Disk->inode[j].start_block + size;
+
+                    mask = 1;
+                    while (size > 0){
+                        Disk->free_block_list[j] &= ~(mask << k);
+                        size--;
+                        k++;
+                        if (k > 7){
+                            j--;
+                            k = 0;
+                        }
+                    }
+                    memset(&Disk->inode[j].name,0,5);
+                    memset(&Disk->inode[j].start_block,0,1);
+                    memset(&Disk->inode[j].used_size,0,1);
+                    memset(&Disk->inode[j].dir_parent,0,1);
+                    int file_d = open(Dname.c_str(),O_RDWR);
+                    if (file_d < 0){
+                        std:: cerr << "unable to open disk\n";
+                        return;
+                    }
+
+                    write(file_d,Disk->free_block_list, 16);
+
+                    for (int z = 0; z < INODES; z++){
+                        Inode inode = Disk->inode[z];
+                        char *name = new char[5];
+                        std:: memcpy(name,inode.name,5);
+                        int num = write(file_d,name,5);
+                        lseek(file_d,5-num,SEEK_CUR);
+                        write(file_d,&inode.used_size,1);
+                        write(file_d,&inode.start_block,1);
+                        write(file_d,&inode.dir_parent,1);
+                        delete[] name;
+
+                    }
+                    close(file_d);
                 }
             } 
         }
@@ -492,11 +576,16 @@ void fs_read(char name[5], int block_num){
         std::cout << "No disk is mounted\n";
         return;
     }
+
 }
 
 
 void fs_cd(char name[5]){
     // changes the given directory to the specified directory
+    if (Dname.empty()){
+        std::cout << "No disk is mounted\n";
+        return;
+    }
     if (strcmp(name,doubledot.c_str()) != -1){
         if (Directorylocation != MAX127){
             Directorylocation = Disk->inode[Directorylocation].dir_parent & mask;
@@ -521,6 +610,7 @@ void fs_cd(char name[5]){
         }
     }
     std:: cerr << "Error, File/directory" << name << "does not exist\n";
+    return;
 }
 
 void fs_write(char name[5], int block_num){
@@ -531,10 +621,13 @@ void fs_write(char name[5], int block_num){
 }
 
 void fs_buff(uint8_t buff[1024]){
+    if (Dname.empty()){
+        std::cout << "No disk is mounted\n";
+        return;
+    }
     memset(buffer,0,sizeof(buffer));
     memcpy(buffer,buff,sizeof(buffer));
 }
-
 void fs_defrag(void){
     if (Dname.empty()){
         std::cout << "No disk is mounted\n";
@@ -554,6 +647,29 @@ void fs_ls(void){
         std::cout << "No disk is mounted\n";
         return;
     }
+
+    std:: map <int,Inode> mymap;
+    for (int i = 0; i < INODES; i++){
+        if (Directorylocation == (Disk->inode[i].dir_parent & 0x7f)){
+            mymap.insert(std::pair<int,Inode>(i,Disk->inode[i]));
+        }
+    }
+    printf(".     %3d KB\n", (int)mymap.size());
+
+    if (Directorylocation == 127){
+        printf(".     %3d KB\n", (int)mymap.size());  
+    }else{
+        printf("..    %3d KB\n", Child_count((Disk->inode[Directorylocation].dir_parent &0x7f)));
+    }
+
+    for (auto it = mymap.begin(); it != mymap.end(); it++){
+        if (!(it->second.dir_parent & 0x80)){
+            printf("%-5s %3d\n", it->second.name, it->second.used_size & 0x7f);
+        }else{
+            printf("%-5s %3d\n", it->second.name, Child_count(Disk->inode[Directorylocation].dir_parent&0x7f)+2);
+        }
+
+    }   
 }
 
 std::vector<std::string> tokenize(const std::string &str, const char *delim) {
