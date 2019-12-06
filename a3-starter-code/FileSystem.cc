@@ -93,7 +93,7 @@ void fs_mount(char *new_disk_name){
                     map1[start+j] = i;
                 }else{
                     //error message.
-                    std:: cerr << "Error: file system in " << new_disk_name << " is inconsistent with error code 1\n";
+                    std:: cerr << "Error: file system in " << new_disk_name << " is inconsistent with error code 1b\n";
                     return;
                 }
             }
@@ -109,7 +109,7 @@ void fs_mount(char *new_disk_name){
             if (isBitISet(mockBlock->free_block_list[i],7-j)){
                 int arithmetic = size_macro*i+j;
                 if (map1.find(arithmetic) == map1.end()){
-                    std:: cout << "Error: file system in " << new_disk_name << " is inconsistent with error code 1\n";
+                    std:: cout << "Error: file system in " << new_disk_name << " is inconsistent with error code 1c\n";
                     return;
                 }
             }
@@ -355,21 +355,129 @@ void fs_mount(char *new_disk_name){
 }
 
 void fs_create(char name[5], int size){
+    //disk has not been mounted
     if (Dname.empty()){
         std::cout << "No disk is mounted\n";
         return;
     }
-    // search for the name that matches with the current name.
-    // delete the file or directory with char name[5]
+    int i = 0;
+
+    while (i < INODES){
+        if (strcmp(Disk->inode[i].name,"") == 0){
+            //inode that is not in use is found 
+            break;
+        }
+        i = i + 1;
+    }
+    if (i == INODES){
+        std:: cout <<  "Error: Superblock in disk "<< Dname << " is full, cannot create " << name << "\n";
+        return;
+    }
+
+
+    for (int j = 0; j < INODES; j++){
+        if (strncmp(Disk->inode[j].name,name,USED_BLOCK) == 0){
+            uint8_t parent = Disk->inode[i].dir_parent & 0x7f;
+            if(parent == Directorylocation){
+                std:: cout << "Error: File or directory " << name <<" already exists\n";
+                return;
+            } 
+        }
+    }
+    if (strcmp(name,dot.c_str()) == 0){
+        std:: cout <<"Error: File or directory " << name <<" already exists\n";
+        return;
+    }
+
+    if (strcmp(name,doubledot.c_str()) == 0){
+        std:: cout <<"Error: File or directory " << name <<" already exists\n";
+        return;
+    }
+
+    //create a new file within the current working directory
+    uint8_t start;
+    uint8_t dir;
+    if (size == 0){
+        // create a directory
+        dir = 1;
+        dir = dir << 7;
+        start = 0;
+    }else{
+        dir = 0;
+        int count = 0;
+        int j = 0;
+        int k = 7;
+        for (; j < 16; i++){
+            for (; k > -1; k--){
+                if (isBitISet(Disk->free_block_list[j],k)){
+                    count = 0;
+                }else if (!isBitISet(Disk->free_block_list[j],k)){
+                    count++;
+                }
+                if (count == size){
+                    //found 5 free spaces
+                    break;
+                }
+            }
+            if (count == size){
+                break;
+            }
+        }
+        int blocknum =8*j+7-k;
+        start = blocknum - size;
+        //mark
+        mask = 1;
+        while (count > 0){
+            Disk->free_block_list[j] |= (mask << k);
+            count--;
+            k++;
+            if (k > 7){
+                j--;
+                k = 0;
+            }
+        }
+    }
+    Disk->inode[i].dir_parent = Directorylocation;
+    Disk->inode[i].used_size = size;
+    Disk->inode[i].start_block = start;
+    memcpy(Disk->inode[i].name, name,5);
+
+    int file_d = open(Dname.c_str(),O_RDWR);
+    if (file_d < 0){
+        std:: cerr << "unable to open disk\n";
+	    return;
+    }
+
+    write(file_d,Disk->free_block_list, 16);
+
+    for (int z = 0; z < INODES; z++){
+        Inode inode = Disk->inode[z];
+        char *name = new char[5];
+        std:: memcpy(name,inode.name,5);
+        int num = write(file_d,name,5);
+        lseek(file_d,5-num,SEEK_CUR);
+        write(file_d,&(Disk->inode[z].dir_parent),1);
+        write(file_d,&(Disk->inode[z].used_size),1);
+        write(file_d,&(Disk->inode[z].start_block),1);
+        delete[] name;
+
+    }
+    close(file_d);
 
 }
 
 void fs_delete(char name[5]){
-
+    if (Dname.empty()){
+        std::cout << "No disk is mounted\n";
+        return;
+    }
 }
 
 void fs_read(char name[5], int block_num){
-
+    if (Dname.empty()){
+        std::cout << "No disk is mounted\n";
+        return;
+    }
 }
 
 
@@ -383,7 +491,6 @@ void fs_cd(char name[5]){
         return;
     }
     else if (strcmp(name, dot.c_str()) != -1){
-        std::cout<< Directorylocation << "current \n";
         return;
     }
 
@@ -403,7 +510,10 @@ void fs_cd(char name[5]){
 }
 
 void fs_write(char name[5], int block_num){
-    
+    if (Dname.empty()){
+        std::cout << "No disk is mounted\n";
+        return;
+    }
 }
 
 void fs_buff(uint8_t buff[1024]){
@@ -412,15 +522,24 @@ void fs_buff(uint8_t buff[1024]){
 }
 
 void fs_defrag(void){
-
+    if (Dname.empty()){
+        std::cout << "No disk is mounted\n";
+        return;
+    }
 }
 
 void fs_resize(char name[5], int new_size){
-
+    if (Dname.empty()){
+        std::cout << "No disk is mounted\n";
+        return;
+    }
 }
 
 void fs_ls(void){
-
+    if (Dname.empty()){
+        std::cout << "No disk is mounted\n";
+        return;
+    }
 }
 
 std::vector<std::string> tokenize(const std::string &str, const char *delim) {
@@ -440,8 +559,6 @@ std::vector<std::string> tokenize(const std::string &str, const char *delim) {
   return tokens;
 }
 
-// Main....
-
 
 int readInput(std:: string command){
     std:: vector<std:: string> tokenizer = tokenize(command.c_str()," ");
@@ -457,6 +574,9 @@ int readInput(std:: string command){
     else if (tokenizer[0] == "C" && tokenizer.size() == 3){
         if (tokenizer[1].size() > USED_BLOCK){
             std:: cerr << "Command Error: <input file name>, <line number>";
+            return -1;
+        }
+        if (stoi(tokenizer[2]) > 127 || stoi(tokenizer[2]) < 0){
             return -1;
         }
         char *arr = new char[tokenizer[1].size()+1];
@@ -522,9 +642,7 @@ int readInput(std:: string command){
     else if (tokenizer[0] == "Y" && tokenizer.size() == 2){
         char *arr = new char[tokenizer[1].size()+1];
         strcpy(arr,tokenizer[1].c_str());
-        std::cout<< unsigned (Directorylocation) << "current \n";
         fs_cd(arr);
-        std::cout<< unsigned (Directorylocation) << "current \n";
         delete[] arr;
         return 0;
     }
