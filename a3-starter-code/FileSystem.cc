@@ -69,11 +69,11 @@ void fs_mount(char *new_disk_name){
 
 		read(filed,storage,size_macro);
 		char Bused = storage[USED_BLOCK];
-        char size = Bused & mask;
-        int intsizeversion = (int) size;
+        uint8_t size = Bused & 0x7F;
+        int intsizeversion = unsigned(size);
 		uint8_t start;
         char * newstorage = storage + 6;
-        memcpy(&start, newstorage,sizeof(uint8_t));
+        memcpy(&start, storage+6,sizeof(uint8_t));
 		//char parent = temp[7];
 		if (isBitISet(Bused,7)){
             for (int j = 0; j < intsizeversion; j++){
@@ -109,6 +109,7 @@ void fs_mount(char *new_disk_name){
             if (isBitISet(mockBlock->free_block_list[i],7-j)){
                 int arithmetic = size_macro*i+j;
                 if (map1.find(arithmetic) == map1.end()){
+                    std::cout<<arithmetic<<"\n";
                     std:: cout << "Error: file system in " << new_disk_name << " is inconsistent with error code 1c\n";
                     return;
                 }
@@ -130,11 +131,10 @@ void fs_mount(char *new_disk_name){
 		char Sused = storage[USED_BLOCK];
         //char size = Sused & mask;
 		uint8_t start;
-        char * newstorage6 = storage +6;
-        char * newstorage7 = storage + 7;
-        memcpy(&start,newstorage6,sizeof(uint8_t));
+        
+        memcpy(&start,storage+6,sizeof(uint8_t));
 		uint8_t pa;
-        memcpy(&pa,newstorage7,sizeof(uint8_t));
+        memcpy(&pa,storage + 7,sizeof(uint8_t));
         int sev = 7;
 		if (isBitISet(Sused,sev)){
             auto range = usedBlocks_2.equal_range((std::string) name);
@@ -167,12 +167,10 @@ void fs_mount(char *new_disk_name){
         memcpy(name,storage,USED_BLOCK);
         name[NAME_SIZE_LIMIT] = nullchar;
 		char used = storage[USED_BLOCK];
-        char * newstorage6 = storage+6;
-        char * newstorage7 = storage+7;
 		uint8_t start;
-        memcpy(&start,newstorage6,sizeof(uint8_t));
+        memcpy(&start,storage+6,sizeof(uint8_t));
 		uint8_t parent;
-        memcpy(&parent,newstorage7,sizeof(uint8_t));
+        memcpy(&parent,storage+7,sizeof(uint8_t));
         int sev = 7;
         if (isBitISet(used,sev)){
             if ((std:: string) name == ""){
@@ -207,13 +205,11 @@ void fs_mount(char *new_disk_name){
         memcpy(name,storage,USED_BLOCK);
         name[NAME_SIZE_LIMIT] = nullchar;
 		char used = storage[USED_BLOCK];
-        char * newstorage6 = storage+6;
-        char * newstorage7 = storage+7;
 		uint8_t start;
         uint8_t parent;
 
-        memcpy(&start,newstorage6,sizeof(uint8_t));
-        memcpy(&parent,newstorage7,sizeof(uint8_t));
+        memcpy(&start,storage+6,sizeof(uint8_t));
+        memcpy(&parent,storage+7,sizeof(uint8_t));
 
         int sev = 7;
         if (isBitISet(used,sev)){
@@ -244,13 +240,11 @@ void fs_mount(char *new_disk_name){
         char size = used & mask;
         int sizeInt = (int) size;
 
-        char * newstorage6 = storage + 6;
-        char * newstorage7 = storage + 7;
 		uint8_t start;
         uint8_t par;
-        memcpy(&start,newstorage6,sizeof(uint8_t));
+        memcpy(&start,storage+6,sizeof(uint8_t));
 
-        memcpy(&par,newstorage7,sizeof(uint8_t));
+        memcpy(&par,storage+7,sizeof(uint8_t));
         int sev = 7;
         if (isBitISet(used,sev)){
             if (isBitISet(par,sev)){
@@ -279,22 +273,19 @@ void fs_mount(char *new_disk_name){
         //char size = used & mask;
         //int sizeInt = (int) size;
 
-        char * newstorage6 = storage + 6;
-        char * newstorage7 = storage + 7;
-
 		uint8_t start;
-        memcpy(&start,newstorage6,sizeof(uint8_t));
+        memcpy(&start,storage+6,sizeof(uint8_t));
 		uint8_t par;
-        memcpy(&par,newstorage7,sizeof(uint8_t));
+        memcpy(&par,storage+7,sizeof(uint8_t));
 
-        par = par & mask;
-        int sev = 7;
-        if (isBitISet(used,sev)){
+        par = par & 0x7F;
+        if (isBitISet(used,7)){
             if (par == MAX126){
                 std:: cerr << "Error: File System in " << new_disk_name << " is inconsistent with Error 6\n";
                 return;
             }
             if (par != MAX127){
+                std::cout<<"node "<<i<<" has parent "<<unsigned(par)<<"\n";
                 usedBlocks_6.insert(par);
             }
         }
@@ -312,25 +303,20 @@ void fs_mount(char *new_disk_name){
             char used = storage[USED_BLOCK];
             uint8_t par;
 
-            char * newstorage7 = storage + 7;
-
-            memcpy(&par,newstorage7,sizeof(uint8_t));
+            memcpy(&par,storage+7,sizeof(uint8_t));
             int sev = 7;
             if (!isBitISet(used,sev)||!isBitISet(par,sev)){
-                std:: cerr<< "Error: File System in " << new_disk_name << " is inconsistent with error 6\n";
+                std::cout<<"node "<<it<<"\n";
+                std::cout<<"parent "<<unsigned(par)<<"\n";
+                std:: cerr<< "Error: File System in " << new_disk_name << " is inconsistent with error 6a\n";
                 return;
-
             }
         }
 
     }
 
-    int lseekfifth = -1*lseek(filed,0,SEEK_CUR);
-    
-    lseek(filed,lseekfifth,SEEK_CUR);
-    lseek(filed,2*size_macro,SEEK_CUR);
-
-    read(filed,Disk->free_block_list,2*size_macro);
+    lseek(filed,0,SEEK_SET);
+    read(filed,Disk->free_block_list,16);
     for (int i = 0; i < INODES; i++){
         Inode newI;
         char storage[size_macro];
@@ -340,10 +326,8 @@ void fs_mount(char *new_disk_name){
         memcpy(&(newI.used_size),newstorage5,1);
         //mask used with 0x7f
         newI.used_size &= mask;
-        char * newstorage6 = storage + 6;
-        char * newstorage7 = storage + 7;
-        memcpy(&(newI.start_block),newstorage6,1);
-        memcpy(&(newI.dir_parent),newstorage7,1);
+        memcpy(&(newI.start_block),storage+6,1);
+        memcpy(&(newI.dir_parent),storage+7,1);
         // mask parent with 0x7f
         newI.dir_parent &= mask;
 
@@ -373,7 +357,7 @@ void fs_create(char name[5], int size){
         std:: cout <<  "Error: Superblock in disk "<< Dname << " is full, cannot create " << name << "\n";
         return;
     }
-
+    std::cout << name << " is in node "<<i<<"\n";
 
     for (int j = 0; j < INODES; j++){
         if (strncmp(Disk->inode[j].name,name,USED_BLOCK) == 0){
@@ -407,7 +391,8 @@ void fs_create(char name[5], int size){
         int count = 0;
         int j = 0;
         int k = 7;
-        for (; j < 16; i++){
+        for (; j < 16; j++){
+            k = 7;
             for (; k > -1; k--){
                 if (isBitISet(Disk->free_block_list[j],k)){
                     count = 0;
@@ -423,8 +408,9 @@ void fs_create(char name[5], int size){
                 break;
             }
         }
+        
         int blocknum =8*j+7-k;
-        start = blocknum - size;
+        start = blocknum - size + 1;
         //mark
         mask = 1;
         while (count > 0){
@@ -437,8 +423,11 @@ void fs_create(char name[5], int size){
             }
         }
     }
-    Disk->inode[i].dir_parent = Directorylocation;
-    Disk->inode[i].used_size = size;
+    if (i==0) {
+        std::cout<<unsigned(Directorylocation|dir)<<"\n";
+    }
+    Disk->inode[i].dir_parent = Directorylocation|dir;
+    Disk->inode[i].used_size = size|0x80;
     Disk->inode[i].start_block = start;
     memcpy(Disk->inode[i].name, name,5);
 
@@ -456,9 +445,9 @@ void fs_create(char name[5], int size){
         std:: memcpy(name,inode.name,5);
         int num = write(file_d,name,5);
         lseek(file_d,5-num,SEEK_CUR);
-        write(file_d,&(Disk->inode[z].dir_parent),1);
-        write(file_d,&(Disk->inode[z].used_size),1);
-        write(file_d,&(Disk->inode[z].start_block),1);
+        write(file_d,&inode.used_size,1);
+        write(file_d,&inode.start_block,1);
+        write(file_d,&inode.dir_parent,1);
         delete[] name;
 
     }
