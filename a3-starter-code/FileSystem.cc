@@ -693,15 +693,20 @@ void fs_cd(char name[5]){
 }
 
 void fs_write(char name[5], int block_num){
-    // changes the given directory to the specified directory
+    // check if the disk is mounted..
     if (Dname.empty()){
         std::cout << "No disk is mounted\n";
         return;
     }
+    //iterate over the inodes
     for (int i = 0; i < INODES; i++){
+        //retrieve the dir parent 
         uint8_t parent = Disk->inode[i].dir_parent & 0x7f;
+        //string match the names
         if (strncmp(Disk->inode[i].name,name,5) == 0){
+            // if we are in the proper directory..
             if (parent == Directorylocation){
+                //write to the disk..
                 int filed = open(Dname.c_str(),O_RDWR);
                 lseek(filed, 1024*(Disk->inode[i].start_block)+1024*block_num, SEEK_SET);
                 write(filed,buffer,1024);
@@ -721,14 +726,18 @@ void fs_write(char name[5], int block_num){
 }
 
 void fs_buff(uint8_t buff[1024]){
+    // check if the disk is mounted..
     if (Dname.empty()){
         std::cout << "No disk is mounted\n";
         return;
     }
+    //clear the buffer
     memset(buffer,0,sizeof(buffer));
+    //rewrite the buffer.
     memcpy(buffer,buff,sizeof(buffer));
 }
 void fs_defrag(void){
+    // check if the disk is mounted..
     if (Dname.empty()){
         std::cout << "No disk is mounted\n";
         return;
@@ -736,6 +745,7 @@ void fs_defrag(void){
 }
 
 void fs_resize(char name[5], int new_size){
+    // check if the disk is mounted..
     if (Dname.empty()){
         std::cout << "No disk is mounted\n";
         return;
@@ -743,38 +753,46 @@ void fs_resize(char name[5], int new_size){
 }
 
 void fs_ls(void){
+    // check if the disk is mounted..
     if (Dname.empty()){
         std::cout << "No disk is mounted\n";
         return;
     }
-
+    //insert the children of the current directory into a map of inodes along with its index.
     std:: map <int,Inode> mymap;
     for (int i = 0; i < INODES; i++){
         if (Directorylocation == (Disk->inode[i].dir_parent & 0x7f)){
             mymap.insert(std::pair<int,Inode>(i,Disk->inode[i]));
         }
     }
+    // print the current directory and the amount of children it has
     printf(".     %3d\n", (int)mymap.size()+2);
 
-
+    // if root
     if (Directorylocation == 127){
+        //print the root directory size
         printf("..    %3d\n", (int)mymap.size()+2);  
     }else{
+        //print the directory and its number of children.
         printf("..    %3d\n", Child_count((Disk->inode[Directorylocation].dir_parent &0x7f))+2);
     }
-
+    //iterate through the map to find all of the children to list.
     for (auto it = mymap.begin(); it != mymap.end(); it++){
+        //retrieve the names of the children
         char * name = new char[6];
         memset(name,0,6);
         strncpy(name, it->second.name,5);
         name[6] = '\0';
-        //if the node is in use
-        if (it->second.used_size & 0x80){
+        
 
+        // check if the inode is in use
+        if (it->second.used_size & 0x80){
+            // check if file
             if (!(it->second.dir_parent & 0x80)){
-                
+                //print file size
                 printf("%-5s %3d KB\n", name, it->second.used_size & 0x7f);
             }else{
+                // print directory size.
                 printf("%-5s %3d\n", name, Child_count(Disk->inode[Directorylocation].dir_parent&0x7f)+2);
             }
         }
@@ -784,42 +802,47 @@ void fs_ls(void){
 }
 
 std::vector<std::string> tokenize(const std::string &str, const char *delim) {
-  char* cstr = new char[str.size() + 1];
-  std::strcpy(cstr, str.c_str());
+    //dragonshell's tokenize function..
 
-  char* tokenized_string = strtok(cstr, delim);
+    char* cstr = new char[str.size() + 1];
+    std::strcpy(cstr, str.c_str());
 
-  std::vector<std::string> tokens;
-  while (tokenized_string != NULL)
-  {
-    tokens.push_back(std::string(tokenized_string));
-    tokenized_string = strtok(NULL, delim);
-  }
-  delete[] cstr;
+    char* tokenized_string = strtok(cstr, delim);
 
-  return tokens;
+    std::vector<std::string> tokens;
+    while (tokenized_string != NULL)
+    {
+        tokens.push_back(std::string(tokenized_string));
+        tokenized_string = strtok(NULL, delim);
+    }
+    delete[] cstr;
+
+    return tokens;
 }
 
 
 int readInput(std:: string command){
+    //parsing commands properly
     std:: vector<std:: string> tokenizer = tokenize(command.c_str()," ");
-
+    // fs mount..
     if (tokenizer[0] == "M" && tokenizer.size() == 2){
-
+        //pass in the disk name to check and mount....
         char *arr = new char[tokenizer[1].size()+1];
         strcpy(arr, tokenizer[1].c_str());
         fs_mount(arr);
         delete[] arr;
         return 0;
-    }
+    } // fs create
     else if (tokenizer[0] == "C" && tokenizer.size() == 3){
+        //if the name is over 5 chars in length.
         if (tokenizer[1].size() > USED_BLOCK){
             std:: cerr << "Command Error: <input file name>, <line number>";
             return -1;
-        }
+        } // if the size is out of range.
         if (stoi(tokenizer[2]) > 127 || stoi(tokenizer[2]) < 0){
             return -1;
         }
+        // copy the name and pass to fs create along with the third arg as its size.
         char *arr = new char[6];
         memset(arr,0,6);
         strcpy(arr,tokenizer[1].c_str());
@@ -829,7 +852,7 @@ int readInput(std:: string command){
         return 0;
     }
     else if (tokenizer[0] == "D" && tokenizer.size() == 2){
-        
+        // copy the name to delete..
         char *arr = new char[6];
         memset(arr,0,6);
         strcpy(arr,tokenizer[1].c_str());
@@ -838,6 +861,7 @@ int readInput(std:: string command){
         return 0;
     }
     else if (tokenizer[0] == "R" && tokenizer.size() == 3){
+        //copy the name to read.
         char *arr = new char[tokenizer[1].size() + 1];
         strcpy(arr, tokenizer[1].c_str());
         int bnumber = stoi(tokenizer[2]);
@@ -846,20 +870,21 @@ int readInput(std:: string command){
         return 0;
     }
     else if (tokenizer[0] == "W" && tokenizer.size() == 3){
+        // pass in a copied string of the arguments to write
         char *arr = new char[tokenizer[1].size() + 1];
         strcpy(arr, tokenizer[1].c_str());
         int bnumber = stoi(tokenizer[2]);
-        fs_read(arr, bnumber);
+        fs_write(arr, bnumber);
         delete[] arr;
         return 0;
     }
     else if (tokenizer[0] == "B" && tokenizer.size() >= 2){
-        
         if ((command.size() - command.find("B")> 1026)){
             // command exceeds the size of the buffer
             std:: cerr << "command exceeds the size of the buffer.\n";
             return -1;
         }
+        //pass in a buffer to update the existing one.
         uint8_t *buff = new uint8_t[BUFFER_SIZE_PRESET];
         memset(buff,0,1024);
         copy(command.begin() + command.find("B"),command.end(), buff);
@@ -868,10 +893,13 @@ int readInput(std:: string command){
         return 0;
     }
     else if (tokenizer[0] == "L" && tokenizer.size() == 1){
+        //call ls to see the children of the current directory
         fs_ls();
         return 0;
     }
     else if (tokenizer[0] == "E" && tokenizer.size() == 3){
+
+        //pass in the copied tokenized string to fs_resize.
         char *arr = new char[tokenizer[1].size() + 1];
         strcpy(arr, tokenizer[1].c_str());
         int bnumber = stoi(tokenizer[2]);
@@ -881,20 +909,21 @@ int readInput(std:: string command){
 
     }
     else if (tokenizer[0] == "O" && tokenizer.size() == 1){
+        //defrag..
         fs_defrag();
         return 0;
     }
     else if (tokenizer[0] == "Y" && tokenizer.size() == 2){
+        //pass the name of the file/directory to go into.
         char *arr = new char[6];
         memset(arr,0,6);
         strcpy(arr,tokenizer[1].c_str());
         arr[6]='\0';
-        
+        // go into a given directory.
         fs_cd(arr);
         delete[] arr;
         return 0;
     }
-    // std:: cerr << "Command Error: <input file name>, <line number>\n";
     return -1;
 
 }
@@ -906,15 +935,16 @@ int main(int argc, char *argv[]){
     //clear the given buffer...
     memset(buffer,0,sizeof(buffer));
     std:: string line;
+    //retrieve the commands.
     char * input = argv[1];
     std:: ifstream commands (input);
-
+    //initialize the superblock objects to read and write to a disk.
     Disk = new Super_block;
     mockBlock = new Super_block;
-
+    // if commands are invalid.
     if (!commands.is_open()){
         return -1;
-    }else{
+    }else{ //if the command is valid, we keep getting input for any input file.
         int lnumber = 1;
         while (getline(commands,line)){
             if (readInput(line)==-1){
@@ -923,6 +953,7 @@ int main(int argc, char *argv[]){
             lnumber = lnumber + 1;
         }
     }
+    //clear memory.
     delete Disk;
     delete mockBlock;
     return 0;

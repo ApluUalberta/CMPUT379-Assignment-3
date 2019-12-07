@@ -12,6 +12,6 @@ clean:
 	rm -f FileSystem *.o
 	rm -f fs
 
-taring: FileSystem.cc readme.md
+taring: FileSystem.cc README.md
 
-	tar -cvf APLU-FileSystem.tar.gz FileSystem.cc FileSystem.h readme.md Makefile
+	tar -cvf APLU-FileSystem.tar.gz FileSystem.cc FileSystem.h README.md Makefile
