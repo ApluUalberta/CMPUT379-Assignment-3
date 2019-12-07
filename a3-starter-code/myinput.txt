@@ -1,6 +1,6 @@
 M disk1
 L
-C file1 1
+C dir1 0
 L
-D file1
+Y dir1
 L

@@ -42,13 +42,13 @@ int size_macro = 8;
 char nullchar = '\0';
 int mask0x80 = 0x80;
 
-
+// check if bit i is set in the given 8 bit integer
 
 int isBitISet( uint8_t ch, int i ){
     uint8_t mask = 1 << i;
     return mask & ch;
 } 
-
+// counts a directory's children
 int Child_count(uint8_t dir){
     int count = 0;
 
@@ -68,42 +68,49 @@ void fs_mount(char *new_disk_name){
 	    return;
     }    //if found..
 
-
+    // read the mock freeblock list
     Super_block *mockBlock = new Super_block;
     read(filed, mockBlock->free_block_list, 2*size_macro);
 
-
+    //use a map to keep track of bytes
 	std:: map<int,int> map1;
 	for (int i = 0; i < INODES;i++){
+        //create a temporary char array for consistency tests.
 		char storage[size_macro];
 
+        //reference the proper inode attributes in the correct positions
 		read(filed,storage,size_macro);
 		char Bused = storage[USED_BLOCK];
         uint8_t size = Bused & 0x7F;
         int intsizeversion = unsigned(size);
 		uint8_t start;
-
+        // copy the size to the address of the start of the block to get proper positioning 
         memcpy(&start, storage+6,sizeof(uint8_t));
-		//char parent = temp[7];
+		// check if the inode is in use
 		if (isBitISet(Bused,7)){
+            //loop to check from the left end
             for (int j = 0; j < intsizeversion; j++){
+                //finding the location in the free block space that corresponds to the given bit
                 uint8_t bytecheckmod = start + j;
                 uint8_t bitcheckmod = start + j;
                 int check_byte = (bytecheckmod)/size_macro;
                 int check_bit = (bitcheckmod)%size_macro;
                 check_bit = 7-check_bit;
+
+                //if the buyte goes over the limit..
                 if (check_byte > 2*size_macro){
                     continue;
                 }
+                // if the blocks that are marked free in the free-space list are allocated to any file.
                 if (!isBitISet(mockBlock->free_block_list[check_byte],check_bit)){
                     std:: cerr << "Error: file system in " << new_disk_name << " is inconsistent with error code 1\n";
                     return;
                 }
                 if (map1.find(bytecheckmod)==map1.end()){
                     map1[start+j] = i;
-                }else{
+                }else{ // if we are not at the end.
                     //error message.
-                    std:: cerr << "Error: file system in " << new_disk_name << " is inconsistent with error code 1b\n";
+                    std:: cerr << "Error: file system in " << new_disk_name << " is inconsistent with error code 1\n";
                     return;
                 }
             }
@@ -111,6 +118,7 @@ void fs_mount(char *new_disk_name){
 		} 
         
 	}
+    //similarly, blocks marked in use in the free-space list must be allocated to exactly one file.
     for (int i = 0; i < 2*size_macro; i++){
         for (int j = 0; j < size_macro; j++){
             if (i == 0 && j == 0){
@@ -119,37 +127,42 @@ void fs_mount(char *new_disk_name){
             if (isBitISet(mockBlock->free_block_list[i],7-j)){
                 int arithmetic = size_macro*i+j;
                 if (map1.find(arithmetic) == map1.end()){
-                    std::cout<<arithmetic<<"\n";
-                    std:: cout << "Error: file system in " << new_disk_name << " is inconsistent with error code 1c\n";
+
+                    std:: cout << "Error: file system in " << new_disk_name << " is inconsistent with error code 1\n";
                     return;
                 }
             }
         }
     }      
 
+    // reset the file pointer.
     int lseekval = -1*lseek(filed,0,SEEK_CUR);
     lseek(filed,lseekval,SEEK_CUR);
     lseek(filed,2*size_macro,SEEK_CUR);
-
+    // read the mock freeblock list
 	std:: multimap<std:: string,uint8_t> usedBlocks_2;
 	for (int i = 0; i < INODES;i++){
 		char storage[size_macro];
+        //set the char array's elements to the corresponding inode placements.
 		read(filed,storage,size_macro);
         char name[NAME_SIZE_LIMIT];
         memcpy(name,storage,USED_BLOCK);
         name[NAME_SIZE_LIMIT] = nullchar;
 		char Sused = storage[USED_BLOCK];
-        //char size = Sused & mask;
+
 		uint8_t start;
-        
+        // copy the size over to start to gauge properly.
         memcpy(&start,storage+6,sizeof(uint8_t));
 		uint8_t pa;
         memcpy(&pa,storage + 7,sizeof(uint8_t));
+
+        // check 7th bit
         int sev = 7;
 		if (isBitISet(Sused,sev)){
             auto range = usedBlocks_2.equal_range((std::string) name);
             if (isBitISet(Sused,7)){
                 std:: string nameString = (std:: string) name;
+                // iterate through the map. If the parent is equal to the second argument.. the name is not unique
                 for (auto i = range.first;i!= range.second;i++){
 
                     if (i->second==pa){
@@ -164,32 +177,38 @@ void fs_mount(char *new_disk_name){
         }
     }
 
+
+    // reset the file pointer.
     // check 3
     lseekval = -1*lseek(filed,0,SEEK_CUR);
     lseek(filed,lseekval,SEEK_CUR);
     lseek(filed,2*size_macro,SEEK_CUR);
-
+    // read the mock freeblock list
 	std:: multimap<std:: string,uint8_t> usedBlocks_3;
 	for (int i = 0; i < INODES;i++){
 		char storage[size_macro];
+        //set the char array's elements to the corresponding inode placements.
 		read(filed,storage,size_macro);
         char name[NAME_SIZE_LIMIT];
         memcpy(name,storage,USED_BLOCK);
         name[NAME_SIZE_LIMIT] = nullchar;
 		char used = storage[USED_BLOCK];
 		uint8_t start;
+        // copy the size over to start to gauge properly.
         memcpy(&start,storage+6,sizeof(uint8_t));
 		uint8_t parent;
         memcpy(&parent,storage+7,sizeof(uint8_t));
         int sev = 7;
+        // check 7th bit
         if (isBitISet(used,sev)){
+            //check if Otherwise, the name attribute stored in the inode must have at least one bit that is not zero.
             if ((std:: string) name == ""){
                 std:: cerr << "Error: file system in " << new_disk_name << "is inconsistend with error code 3\n";
                 return;
             }
 
         }
-
+        // if the . If the state of an inode is free, check if the bits are all 0
         else{
             for (int i = 0; i < size_macro; i++){
                 for (int j = 0; j < size_macro; j++){
@@ -201,14 +220,16 @@ void fs_mount(char *new_disk_name){
             }
         }
     }
+    // reset the file pointer.
     // check 4
     lseekval = -1*lseek(filed,0,SEEK_CUR);
     lseek(filed,lseekval,SEEK_CUR);
     lseek(filed,2*size_macro,SEEK_CUR);
+    // read the mock freeblock list
 	std:: multimap<std:: string,uint8_t> usedBlocks_4;
 	for (int i = 0; i < INODES;i++){
 		char storage[size_macro];
-
+        //set the char array's elements to the corresponding inode placements.
 		read(filed,storage,size_macro);
         char name[NAME_SIZE_LIMIT];
         memcpy(name,storage,USED_BLOCK);
@@ -216,14 +237,16 @@ void fs_mount(char *new_disk_name){
 		char used = storage[USED_BLOCK];
 		uint8_t start;
         uint8_t parent;
-
+        // copy the size over to start to gauge properly.
         memcpy(&start,storage+6,sizeof(uint8_t));
         memcpy(&parent,storage+7,sizeof(uint8_t));
-
+        // check 7th bit
         int sev = 7;
         if (isBitISet(used,sev)){
+            // if in use, check if it is a directory or file
             if (!(isBitISet(parent,sev))){
                 int sInt = (unsigned int) start;
+                //check if inode is in range.
                 if (sInt > MAX127 ||sInt <MIN1){
                     std:: cerr << "Error, File System in " << new_disk_name << " is inconsistent with Error 4\n";
                     return;
@@ -231,16 +254,16 @@ void fs_mount(char *new_disk_name){
             }
         }
     }
-
+    // reset the file pointer.
     // check 5
     int lseeksecond = -1*lseek(filed,0,SEEK_CUR);
     lseek(filed,lseeksecond,SEEK_CUR);
     lseek(filed,2*size_macro,SEEK_CUR);
-
+    // read the mock freeblock list
 	std:: multimap<std:: string,uint8_t> usedBlocks_5;
 	for (int i = 0; i < INODES;i++){
 		char storage[size_macro];
-
+        //set the char array's elements to the corresponding inode placements.
 		read(filed,storage,size_macro);
         char name[NAME_SIZE_LIMIT];
         memcpy(name,storage,USED_BLOCK);
@@ -248,15 +271,16 @@ void fs_mount(char *new_disk_name){
 		char used = storage[USED_BLOCK];
         char size = used & 0x7f;
         int sizeInt = (int) size;
-
+        // copy the size over to start the gauge properly
 		uint8_t start;
         uint8_t par;
         memcpy(&start,storage+6,sizeof(uint8_t));
-
         memcpy(&par,storage+7,sizeof(uint8_t));
+        //check 7th bit
         int sev = 7;
         if (isBitISet(used,sev)){
             if (isBitISet(par,sev)){
+                //check if the size and start block of the directory is 0
                 if ((unsigned) sizeInt != 0 || (unsigned)start != 0){
                     std:: cerr<< "Error: File system in " << new_disk_name << " is inconsistent with Error 5\n";
                     return;
@@ -264,31 +288,31 @@ void fs_mount(char *new_disk_name){
             }
         }
     }
-
+    //reset the file pointer
     int lseekthird = -1*lseek(filed,0,SEEK_CUR);
     // check 6
     lseek(filed,lseekthird,SEEK_CUR);
     lseek(filed,2*size_macro,SEEK_CUR);
-
+    // read the mock freeblock list
 	std:: set<int> usedBlocks_6;
 	for (int i = 0; i < INODES;i++){
 		char storage[size_macro];
-
+        //set the char array's elements to the corresponding inode placements.
 		read(filed,storage,size_macro);
         char name[NAME_SIZE_LIMIT];
         memcpy(name,storage,USED_BLOCK);
         name[NAME_SIZE_LIMIT] = nullchar;
 		char used = storage[USED_BLOCK];
-        //char size = used & mask;
-        //int sizeInt = (int) size;
+        // copy the size over to start the gauge properly
 
 		uint8_t start;
         memcpy(&start,storage+6,sizeof(uint8_t));
 		uint8_t par;
         memcpy(&par,storage+7,sizeof(uint8_t));
-
+        //check 7th bit
         par = par & 0x7F;
         if (isBitISet(used,7)){
+            //For every inode, the index of its parent inode cannot be 126.
             if (par == MAX126){
                 std:: cerr << "Error: File System in " << new_disk_name << " is inconsistent with Error 6\n";
                 return;
@@ -301,6 +325,7 @@ void fs_mount(char *new_disk_name){
 
 
         for (int it : usedBlocks_6){
+            // if the index of the parent inode is between 0 and 125 inclusive, then the parent inode must be in use and marked as a directory.
 
             int lseekfinal = -1*lseek(filed,0,SEEK_CUR);
             lseek(filed,lseekfinal,SEEK_CUR);
@@ -311,12 +336,10 @@ void fs_mount(char *new_disk_name){
             read(filed,storage,size_macro);
             char used = storage[USED_BLOCK];
             uint8_t par;
-
+            //check if the inode is free or allocated to a file.
             memcpy(&par,storage+7,sizeof(uint8_t));
             int sev = 7;
             if (!isBitISet(used,sev)||!isBitISet(par,sev)){
-                std::cout<<"node "<<it<<"\n";
-                std::cout<<"parent "<<unsigned(par)<<"\n";
                 std:: cerr<< "Error: File System in " << new_disk_name << " is inconsistent with error 6a\n";
                 return;
             }
@@ -324,10 +347,14 @@ void fs_mount(char *new_disk_name){
 
     }
 
-    lseek(filed,0,SEEK_SET);
 
+
+    //reset the pointer
+    lseek(filed,0,SEEK_SET);
+    //read the disk to then mount the disk
     read(filed,Disk->free_block_list,16);
     for (int i = 0; i < INODES; i++){
+        //copy all the inodes over to mount the disk
         Inode newI;
         char storage[size_macro];
         read(filed,storage,size_macro);
@@ -342,6 +369,7 @@ void fs_mount(char *new_disk_name){
 
         Disk->inode[i] = newI;
     }
+    //update the name and directory as root..
     Directorylocation =(uint8_t) MAX127;
     Dname = (std:: string) new_disk_name;
 
@@ -354,7 +382,7 @@ void fs_create(char name[5], int size){
         return;
     }
     int i = 0;
-
+    //iterate over the inodes to check if there are any free inodes
     while (i < INODES){
         if (strcmp(Disk->inode[i].name,"") == 0){
             //inode that is not in use is found 
@@ -362,11 +390,12 @@ void fs_create(char name[5], int size){
         }
         i = i + 1;
     }
+    //if there are no free blocks in memory
     if (i == INODES){
         std:: cout <<  "Error: Superblock in disk "<< Dname << " is full, cannot create " << name << "\n";
         return;
     }
-
+    //iterate over inodes to check if the directory already exists
     for (int j = 0; j < INODES; j++){
         if (strncmp(Disk->inode[j].name,name,USED_BLOCK) == 0){
             uint8_t parent = Disk->inode[i].dir_parent & 0x7f;
@@ -376,11 +405,12 @@ void fs_create(char name[5], int size){
             } 
         }
     }
+    //handle if user inputs ..
     if (strcmp(name,dot.c_str()) == 0){
         std:: cout <<"Error: File or directory " << name <<" already exists\n";
         return;
     }
-
+    //handle if user inputs .
     if (strcmp(name,doubledot.c_str()) == 0){
         std:: cout <<"Error: File or directory " << name <<" already exists\n";
         return;
@@ -389,18 +419,19 @@ void fs_create(char name[5], int size){
     //create a new file within the current working directory
     uint8_t start;
     uint8_t dir;
+    //check if the creation is of a directory or not
     if (size == 0){
-        //std::cout<<"create directory "<<name<<"\n";
         // create a directory
         dir = 1;
         dir = dir << 7;
         start = 0;
     }else{
+        //is file creation
         dir = 0;
         int count = 0;
         int j = 0;
         int k = 7;
-//        std:: cout << "before "<<(int)Disk->free_block_list[0] << "\n";
+        // iterate to find the necessary amount of free space. if a non-free space is encountered, count resets and tries again until it reaches size.
         for (; j < 16; j++){
 
             k = 7;
@@ -415,11 +446,12 @@ void fs_create(char name[5], int size){
                     break;
                 }
             }
+            //found..
             if (count == size){
                 break;
             }
         }
-        
+        // set the found blocks to 1's to mark in use...
         int blocknum =8*j+7-k;
         start = blocknum - size+1;
         //mark
@@ -433,26 +465,28 @@ void fs_create(char name[5], int size){
                 k = 0;
             }
         }
-       // std::cout<<"after: "<<(int)Disk->free_block_list[0]<<"\n";
     }
+    //copy updated values into the inodes.
     Disk->inode[i].dir_parent = Directorylocation|dir;
     Disk->inode[i].start_block = start;
     Disk->inode[i].used_size = size|0x80;
+    //copy name..
     memset(Disk->inode[i].name,0,5);
     memcpy(Disk->inode[i].name, name,5);
 
+    //update the disk..
     int file_d = open(Dname.c_str(),O_RDWR);
     if (file_d < 0){
         std:: cerr << "unable to open disk\n";
 	    return;
     }
-
+    //write to the disk..
     write(file_d,Disk->free_block_list, 16);
 
     for (int z = 0; z < INODES; z++){
         Inode inode = Disk->inode[z];
         char *name = new char[5];
-
+        //write the inode values to the disk..
         std:: memcpy(name,inode.name,5);
         int num = write(file_d,name,5);
         lseek(file_d,5-num,SEEK_CUR);
@@ -462,6 +496,7 @@ void fs_create(char name[5], int size){
         delete[] name;
 
     }
+    //terminate the file pointer.
     close(file_d);
 
 }
@@ -471,20 +506,18 @@ void fs_delete(char name[5]){
         std::cout << "No disk is mounted\n";
         return;
     }
-    //std:: cout << Disk->inode[0].name << " is inode name \n";
-    //std:: cout << name << " is passed name\n";
-
+    //iterate through the inodes to check where the names match up
     for (int j = 0; j < INODES; j++){
+        // if the names match up
         if (strncmp(Disk->inode[j].name,name,5) == 0){
             uint8_t parent = Disk->inode[j].dir_parent & 0x7f;
-
+            // if the file is in the current directory
             if(parent == Directorylocation){
-                // i is the inode that we want
-                // check if inode[i] is a directory or file
-                //std:: cout << "i'm outside the mask comparison\n";
+                //if directory
                 if (Disk->inode[j].dir_parent&0x80){
-                    //std:: cout << "I'm inside the mask comp\n";
-                    // is a directory
+                    
+                    //recursively delete the children.
+                    //call fs_delete() on map elements
                     std:: map<int, Inode> Dchildren;
                     for (int k = 0; k < INODES; k++){
                         //find all inodes with the parent j
@@ -493,9 +526,9 @@ void fs_delete(char name[5]){
                         }
                     }
                     uint8_t savedDir = Directorylocation;
-                    
+                    //update the directory location for fs_delete()
                     Directorylocation = j;
-                    
+                    //fs_delete is called upon map elements....
                     for (auto itr = Dchildren.begin(); itr != Dchildren.end(); itr++){
                         fs_delete(itr->second.name);
                     }
@@ -503,12 +536,13 @@ void fs_delete(char name[5]){
 
                     Directorylocation = savedDir;
 
-
+                    //update inodes.
                     memset(&Disk->inode[j].name,0,5);
                     memset(&Disk->inode[j].start_block,0,1);
                     memset(&Disk->inode[j].used_size,0,1);
                     memset(&Disk->inode[j].dir_parent,0,1);
 
+                    // update the disk..
 
                     int file_d = open(Dname.c_str(),O_RDWR);
                     if (file_d < 0){
@@ -524,6 +558,7 @@ void fs_delete(char name[5]){
                         char *name = new char[5];
                         std:: memcpy(name,inode.name,5);
                         int num = write(file_d,name,5);
+                        //write to the disk.
                         lseek(file_d,5-num,SEEK_CUR);
                         write(file_d,&inode.used_size,1);
                         write(file_d,&inode.start_block,1);
@@ -535,11 +570,12 @@ void fs_delete(char name[5]){
 
 
                 }else{
+                    //file deletion.
                     int start = Disk->inode[j].start_block;
                     int bytecheck = start/8;
                     int bitcheck = start%8;
                     bitcheck = 7 - bitcheck;
-
+                    // go through the proper blocks in memory fro the free block list to mark as 0
                     int numberofbits = 0;
                     while (numberofbits < (Disk->inode[j].used_size &0x7f)){
                         
@@ -552,12 +588,14 @@ void fs_delete(char name[5]){
                             bytecheck++;
                         }
                     }
-
+                    //update the inode values.
                     memset(&Disk->inode[j].name,0,5);
                     memset(&Disk->inode[j].start_block,0,1);
                     memset(&Disk->inode[j].used_size,0,1);
                     memset(&Disk->inode[j].dir_parent,0,1);
 
+
+                    //update the disk
                     int filed = open(Dname.c_str(),O_RDWR);
                     lseek(filed,Disk->inode[j].start_block*1024,SEEK_SET);
                     for (int p = 0; p < INODES; p++){
@@ -573,6 +611,7 @@ void fs_delete(char name[5]){
                         std:: memcpy(name,inode.name,5);
                         int num = write(filed,name,5);
                         lseek(filed,5-num,SEEK_CUR);
+                        //write to the disk.
                         write(filed,&inode.used_size,1);
                         write(filed,&inode.start_block,1);
                         write(filed,&inode.dir_parent,1);
@@ -588,23 +627,27 @@ void fs_delete(char name[5]){
 }
 
 void fs_read(char name[5], int block_num){
+    //check if the disk is mounted.
     if (Dname.empty()){
         std::cout << "No disk is mounted\n";
         return;
     }
-    for (int i = 0; i < INODES; i++){
-        uint8_t parent = Disk->inode[i].dir_parent & 0x7f;
-        if (strncmp(Disk->inode[i].name,name,5) == 0){
-            if (parent == Directorylocation){
 
+    //iterate over the inodes
+    for (int i = 0; i < INODES; i++){
+        //get the parent of the inode
+        uint8_t parent = Disk->inode[i].dir_parent & 0x7f;
+        //check if the name is matching
+        if (strncmp(Disk->inode[i].name,name,5) == 0){
+            //if we are in the right directory
+            if (parent == Directorylocation){
+                //read the disk
                 int filed = open(Dname.c_str(),O_RDWR);
                 lseek(filed, 1024*(Disk->inode[i].start_block)+1024*block_num, SEEK_SET);
                 read(filed,buffer,1024);
                 close(filed);
                 return;
             }
-            //write buffer to the block_numth block of the file...
-            // take the buffer
             else{
                 std:: cerr << "Error: " << name << "does not have block " << block_num << "\n";
                 return;
@@ -621,27 +664,27 @@ void fs_cd(char name[5]){
     if (Dname.empty()){
         return;
     }
-    
+    //is cd going to parent?
     if (strcmp(name,"..") == 0){
         if (Directorylocation != MAX127){
             Directorylocation = Disk->inode[Directorylocation].dir_parent & 0x7f;
         } 
         return;
     }
-    
+    // is cd just the current directory?
     if (strcmp(name, ".") == 0){
         return;
     }
-    
+    //else..
     for (uint8_t i = 0; i < INODES;i++){
+        //check the parent value;..
         uint8_t parent = Disk->inode[i].dir_parent;
         parent = parent & 0x7F;
-
+        //if the name matches and we are in the right directory
         if (strncmp(Disk->inode[i].name,name,5) == 0 && (parent == Directorylocation)){
-            
+            // we change the given direcotry's location.
             if ((Disk->inode[i].dir_parent & 0x80)){
                 Directorylocation = i;
-                
                 return;
             }
         }
@@ -650,6 +693,7 @@ void fs_cd(char name[5]){
 }
 
 void fs_write(char name[5], int block_num){
+    // changes the given directory to the specified directory
     if (Dname.empty()){
         std::cout << "No disk is mounted\n";
         return;
@@ -724,10 +768,15 @@ void fs_ls(void){
         memset(name,0,6);
         strncpy(name, it->second.name,5);
         name[6] = '\0';
-        if (!(it->second.dir_parent & 0x80)){
-            printf("%-5s %3d KB\n", name, it->second.used_size & 0x7f);
-        }else{
-            printf("%-5s %3d\n", name, Child_count(Disk->inode[Directorylocation].dir_parent&0x7f)+2);
+        //if the node is in use
+        if (it->second.used_size & 0x80){
+
+            if (!(it->second.dir_parent & 0x80)){
+                
+                printf("%-5s %3d KB\n", name, it->second.used_size & 0x7f);
+            }else{
+                printf("%-5s %3d\n", name, Child_count(Disk->inode[Directorylocation].dir_parent&0x7f)+2);
+            }
         }
         delete[] name;
     }
