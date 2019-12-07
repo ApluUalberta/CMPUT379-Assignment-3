@@ -471,14 +471,19 @@ void fs_delete(char name[5]){
         std::cout << "No disk is mounted\n";
         return;
     }
+    //std:: cout << Disk->inode[0].name << " is inode name \n";
+    //std:: cout << name << " is passed name\n";
 
     for (int j = 0; j < INODES; j++){
-        if (strncmp(Disk->inode[j].name,name,USED_BLOCK) == 0){
+        if (strncmp(Disk->inode[j].name,name,5) == 0){
             uint8_t parent = Disk->inode[j].dir_parent & 0x7f;
+
             if(parent == Directorylocation){
                 // i is the inode that we want
                 // check if inode[i] is a directory or file
+                //std:: cout << "i'm outside the mask comparison\n";
                 if (Disk->inode[j].dir_parent&0x80){
+                    //std:: cout << "I'm inside the mask comp\n";
                     // is a directory
                     std:: map<int, Inode> Dchildren;
                     for (int k = 0; k < INODES; k++){
@@ -530,7 +535,6 @@ void fs_delete(char name[5]){
 
 
                 }else{
-
                     int start = Disk->inode[j].start_block;
                     int bytecheck = start/8;
                     int bitcheck = start%8;
@@ -617,31 +621,27 @@ void fs_cd(char name[5]){
     if (Dname.empty()){
         return;
     }
-    //std::cout<<"not emtpy\n";
+    
     if (strcmp(name,"..") == 0){
         if (Directorylocation != MAX127){
             Directorylocation = Disk->inode[Directorylocation].dir_parent & 0x7f;
         } 
         return;
     }
-    //std::cout<<"not ..\n";
+    
     if (strcmp(name, ".") == 0){
         return;
     }
-    //std::cout<<"not .\n";
+    
     for (uint8_t i = 0; i < INODES;i++){
         uint8_t parent = Disk->inode[i].dir_parent;
         parent = parent & 0x7F;
-        //std::cout<<"node name "<<Disk->inode[i].name<<"\n";
-        //std::cout<<"arg name "<<name<<"\n";
-        //std::cout<<"parent "<<(int)parent<<"\n";
+
         if (strncmp(Disk->inode[i].name,name,5) == 0 && (parent == Directorylocation)){
-            //std::cout<<"found "<<name<<"\n";
+            
             if ((Disk->inode[i].dir_parent & 0x80)){
-                //std::cout << "mask is successful\n";
-                //std::cout << "";
                 Directorylocation = i;
-                //std::cout<< Directorylocation << "\n";
+                
                 return;
             }
         }
@@ -710,13 +710,13 @@ void fs_ls(void){
             mymap.insert(std::pair<int,Inode>(i,Disk->inode[i]));
         }
     }
-    printf(".     %3d\n", (int)mymap.size());
+    printf(".     %3d\n", (int)mymap.size()+2);
 
 
     if (Directorylocation == 127){
-        printf("..    %3d\n", (int)mymap.size());  
+        printf("..    %3d\n", (int)mymap.size()+2);  
     }else{
-        printf("..    %3d\n", Child_count((Disk->inode[Directorylocation].dir_parent &0x7f)));
+        printf("..    %3d\n", Child_count((Disk->inode[Directorylocation].dir_parent &0x7f))+2);
     }
 
     for (auto it = mymap.begin(); it != mymap.end(); it++){
@@ -781,7 +781,9 @@ int readInput(std:: string command){
     }
     else if (tokenizer[0] == "D" && tokenizer.size() == 2){
         
-        char *arr = new char[tokenizer[1].size()+1];
+        char *arr = new char[6];
+        memset(arr,0,6);
+        strcpy(arr,tokenizer[1].c_str());
         fs_delete(arr);
         delete[] arr;
         return 0;
